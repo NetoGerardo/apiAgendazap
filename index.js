@@ -181,26 +181,6 @@ app.get('/load/:sessionName', (req, res) => {
                         io.emit('qr-' + req.params.sessionName, base64Qr);
                         io.emit('message', 'QR Code received, scan please!');
 
-                        var matches = base64Qr.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/),
-                            response = {};
-
-                        if (matches.length !== 3) {
-                            return new Error('Invalid input string');
-                        }
-                        response.type = matches[1];
-                        response.data = new Buffer.from(matches[2], 'base64');
-
-                        var imageBuffer = response;
-                        require('fs').writeFile(
-                            'qr-codes/' + req.params.sessionName + '.png',
-                            imageBuffer['data'],
-                            'binary',
-                            function (err) {
-                                if (err != null) {
-                                    console.log(err);
-                                }
-                            }
-                        );
                     }, statusFind: (statusSession, session) => {
 
                         if (clientsArray[session]) {
@@ -4021,5 +4001,5 @@ io.on("connection", function (client) {
 
 
 http.listen(3333, function () {
-    console.log('listening on port 3000');
+    console.log('listening on port 3333');
 });
