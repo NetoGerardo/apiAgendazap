@@ -165,8 +165,6 @@ app.get('/load/:sessionName', (req, res) => {
 
         loadTokenFromDB(req.params.sessionName, (myToken) => {
 
-            resetQrCode(req.params.sessionName);
-
             clientsArray[req.params.sessionName] = { status: "SCANNING", browserAberto: true };
 
             wppconnect
