@@ -3611,9 +3611,9 @@ async function analisarClienteFunil(wpp_client, numero, id_sessao, mensagem_rece
 
                                 //VERIFICANDO SE É PRECISO ENVIAR UMA RESPOSTA ANTES DE PASSAR PARA PROXIMA ETAPA
                                 if (array_respostas[i].resposta != "-") {
-                                    passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, array_respostas[i], array_respostas[i].resposta, true, array_respostas[i].encerrar_funil, proxima_tag);
+                                    passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, array_respostas[i], array_respostas[i].resposta, true, array_respostas[i].encerrar_funil, proxima_tag, mensagem_recebida);
                                 } else {
-                                    passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, array_respostas[i], null, true, array_respostas[i].encerrar_funil, proxima_tag);
+                                    passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, array_respostas[i], null, true, array_respostas[i].encerrar_funil, proxima_tag, mensagem_recebida);
                                 }
 
                             }
@@ -3628,10 +3628,10 @@ async function analisarClienteFunil(wpp_client, numero, id_sessao, mensagem_rece
 
                                 //ENVIAR RESPOSTA ESPERADA DEFAULT E PASSAR USUARIO PARA PROXIMA ETAPA
                                 if (respostaDefault.resposta != "-") {
-                                    passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, mensagem_recebida, respostaDefault.resposta, true, respostaDefault.encerrar_funil, respostaDefault.proxima_tag);
+                                    passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, null, respostaDefault.resposta, true, respostaDefault.encerrar_funil, respostaDefault.proxima_tag, mensagem_recebida);
                                 } else {
                                     //CASO O VALOR DA RESPOSTA SEJA (-) APENAS PASSAR O USUÁRIO PARA PROXIMA ETAPA
-                                    passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, mensagem_recebida, null, true, respostaDefault.encerrar_funil, respostaDefault.proxima_tag);
+                                    passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, null, null, true, respostaDefault.encerrar_funil, respostaDefault.proxima_tag, mensagem_recebida);
                                 }
                             } else {
 
@@ -3641,13 +3641,13 @@ async function analisarClienteFunil(wpp_client, numero, id_sessao, mensagem_rece
 
                                     //CASO NÃO EXISTA RESPOSTADEFAULT, ENVIAR A RESPOSTA PADRÃO
                                     //E NÃO PASSAR USUÁRIO PARA PROXIMA ETAPA
-                                    passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, mensagem_recebida, mensagem_atual.resposta_padrao, false, false, null);
+                                    passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, null, mensagem_atual.resposta_padrao, false, false, null, mensagem_recebida);
 
                                 }
                             }
                         }
                     } else {
-                        passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, mensagem_recebida, mensagem_atual.resposta_padrao, false, false, null);
+                        passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, null, mensagem_atual.resposta_padrao, false, false, null, mensagem_recebida);
                     }
 
                 } else {
@@ -3731,7 +3731,38 @@ async function bloquearContato(client, telefone) {
         });
 }
 
-async function passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, json_resposta, resposta_para_enviar, passar_para_proxima_etapa, encerrar_funil, proxima_tag) {
+async function passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atual, json_resposta, resposta_para_enviar, passar_para_proxima_etapa, encerrar_funil, proxima_tag, mensagem_recebida) {
+
+    //VERIFICANDO SE PRECISA SALVAR ALGUM DADO ANTES DE PASSAR O CLIENTE PARA PROXIMA ETAPA
+    if (passar_para_proxima_etapa) {
+        if (mensagem_atual.save_data && mensagem_atual.save_data != "") {
+
+            let meta_dados = cliente_funil.meta_dados;
+
+            if (!meta_dados) {
+                meta_dados = {}
+            }
+
+            meta_dados[mensagem_atual.save_data] = mensagem_recebida;
+
+            //ENCERRANDO FUNIL
+            let query = "UPDATE cliente_funil SET meta_dados = '" + JSON.stringify(meta_dados) + "' WHERE id = " + cliente_funil.id + " ;";
+
+            console.log(query);
+
+            connection.query(query, function (error, results, fields) {
+
+                if (error) {
+                    console.log("Erro ao atualizar dados!");
+                    console.log(error);
+                } else {
+                    console.log("Dados atualizados!");
+                }
+
+            });
+
+        }
+    }
 
     //ENVIANDO RESPOSTA PARA O CLIENTE
     if (resposta_para_enviar != null) {
@@ -3758,26 +3789,6 @@ async function passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atu
     console.log(json_resposta);
 
     if (encerrar_funil) {
-
-        //VERIFICANDO PROXIMA TAG PARA BLOQUEAR O CONTATO
-        if (proxima_tag == "t&t-#msg1" || proxima_tag == "t&t-belem-#msg1") {
-            bloquearContato(wpp_client, cliente_funil.numero);
-        }
-
-        //VERIFICANDO PROXIMA TAG PARA ADICIONAR NO GRUPO BELEM
-        if (proxima_tag == "t&t-belem-#msg2") {
-            enviarContatoNoGrupo(wpp_client, cliente_funil.numero, "558499506625-1631536359@g.us");
-        }
-
-        //VERIFICANDO PROXIMA TAG PARA ADICIONAR NO GRUPO CPotiguar
-        if (proxima_tag == "pesquisa-cpotiguar-#msg2") {
-            enviarContatoNoGrupo(wpp_client, cliente_funil.numero, "558499506625-1633123730@g.us");
-        }
-
-        //VERIFICANDO PROXIMA TAG PARA ADICIONAR NO GRUPO O Doutor
-        if (proxima_tag == "pesquisa-odoutor-#msg2") {
-            enviarContatoNoGrupo(wpp_client, cliente_funil.numero, "558499506625-1633123606@g.us");
-        }
 
         //ENCERRANDO FUNIL
         let query = "UPDATE cliente_funil SET tag = '" + proxima_tag + "', concluido = 1 WHERE id = " + cliente_funil.id + " ;";
@@ -3806,13 +3817,13 @@ async function passarClienteProximaEtapa(wpp_client, cliente_funil, mensagem_atu
 
                 });
             } else {
-                enviarMensagemFunil(wpp_client, cliente_funil.numero, cliente_funil.id, proxima_tag);
+                enviarMensagemFunil(wpp_client, cliente_funil.numero, cliente_funil.id, proxima_tag, cliente_funil);
             }
         }
     }
 }
 
-async function enviarMensagemFunil(wpp_client, numero_cliente_funil, id_cliente_funil, proxima_tag) {
+async function enviarMensagemFunil(wpp_client, numero_cliente_funil, id_cliente_funil, proxima_tag, cliente_funil) {
 
     let query = "UPDATE cliente_funil SET tag = '" + proxima_tag + "' WHERE id = " + id_cliente_funil + " ;";
 
@@ -3831,52 +3842,96 @@ async function enviarMensagemFunil(wpp_client, numero_cliente_funil, id_cliente_
 
             if (results.length > 0) {
 
-                //ENVIANDO MENSAGEM DA PROXIMA ETAPA
-                if (results[0].tipo_media == 'imagem') {
-                    sendImage(wpp_client, numero_cliente_funil + "@c.us", results[0].texto, results[0].url_media);
-                } else if (results[0].tipo_media == 'video') {
-                    sendVideo(wpp_client, numero_cliente_funil + "@c.us", results[0].texto, results[0].url_media);
-                } else if (results[0].tipo_media == 'voz') {
-                    sendVoice(wpp_client, numero_cliente_funil + "@c.us", results[0].texto, results[0].url_media);
-                } else {
-                    sendText(wpp_client, numero_cliente_funil + "@c.us", results[0].texto);
-                }
+                getMessageFullfilment(results[0], cliente_funil, (mensagem) => {
 
-                //VERIFICANDO SE É A ÚLTIMA MENSAGEM DO FUNIL
-                if (results[0].fim_funil == 1) {
-
-                    //ENCERRANDO FUNIL
-                    let query = "UPDATE cliente_funil SET concluido = 1 WHERE id = " + id_cliente_funil + " ;";
-
-                    connection.query(query, function (error, results, fields) {
-
-                    });
-                } else {
-                    //VERIFICANDO SE A MENSAGEM AGUARDA UMA RESPOSTA
-                    //CASO NÃO AGUARDE, ENVIA A PRÓXIMA MENSAGEM EM SEGUIDA
-                    if (results[0].aguardar_resposta == 0) {
-
-                        //TEMPO ANTES DE ENVIAR A PROXIMA MENSAGEM (EM SEGUNDOS)
-                        let tempo_de_espera = 10;
-
-                        if (results[0].dif_minutos) {
-                            tempo_de_espera = results[0].diff_minutos;
-                        }
-
-                        console.log("\n\n\nAGUARDANDO " + tempo_de_espera);
-
-                        setTimeout(function () {
-                            enviarMensagemFunil(wpp_client, numero_cliente_funil, id_cliente_funil, results[0].proxima_tag);
-                        }, tempo_de_espera * 1000)
+                    //ENVIANDO MENSAGEM DA PROXIMA ETAPA
+                    if (results[0].tipo_media == 'imagem') {
+                        sendImage(wpp_client, numero_cliente_funil + "@c.us", mensagem, results[0].url_media);
+                    } else if (results[0].tipo_media == 'video') {
+                        sendVideo(wpp_client, numero_cliente_funil + "@c.us", mensagem, results[0].url_media);
+                    } else if (results[0].tipo_media == 'voz') {
+                        sendVoice(wpp_client, numero_cliente_funil + "@c.us", mensagem, results[0].url_media);
+                    } else {
+                        sendText(wpp_client, numero_cliente_funil + "@c.us", mensagem);
                     }
-                }
 
+                    //VERIFICANDO SE É A ÚLTIMA MENSAGEM DO FUNIL
+                    if (results[0].fim_funil == 1) {
+
+                        //ENCERRANDO FUNIL
+                        let query = "UPDATE cliente_funil SET concluido = 1 WHERE id = " + id_cliente_funil + " ;";
+
+                        connection.query(query, function (error, results, fields) {
+
+                        });
+                    } else {
+                        //VERIFICANDO SE A MENSAGEM AGUARDA UMA RESPOSTA
+                        //CASO NÃO AGUARDE, ENVIA A PRÓXIMA MENSAGEM EM SEGUIDA
+                        if (results[0].aguardar_resposta == 0) {
+
+                            //TEMPO ANTES DE ENVIAR A PROXIMA MENSAGEM (EM SEGUNDOS)
+                            let tempo_de_espera = 10;
+
+                            if (results[0].dif_minutos) {
+                                tempo_de_espera = results[0].diff_minutos;
+                            }
+
+                            console.log("\n\n\nAGUARDANDO " + tempo_de_espera);
+
+                            setTimeout(function () {
+                                enviarMensagemFunil(wpp_client, numero_cliente_funil, id_cliente_funil, results[0].proxima_tag, cliente_funil);
+                            }, tempo_de_espera * 1000)
+                        }
+                    }
+                });
             }
-
         });
     });
 }
 
+async function getMessageFullfilment(mensagem_funil, cliente_funil, callback) {
+
+    if (cliente_funil) {
+        console.log("CLIENTE NÃO NULO!");
+    } else {
+        console.log("CLIENTE NULO!");
+    }
+
+    if (mensagem_funil.tag == "agendamento-consulta-#mg1") {
+        getMedicos((texto) => {
+            callback(texto);
+        });
+
+    } else {
+        callback(mensagem_funil.texto);
+    }
+}
+
+async function getMedicos(callback) {
+
+    let mensagem = "*Qual médico você precisa?*\n\n";
+
+    //ENCERRANDO FUNIL
+    let query = "SELECT * FROM especialidades;";
+
+    console.log(query);
+
+    connection.query(query, function (error, results, fields) {
+
+        if (error) {
+            console.log(error);
+        } else {
+
+            for (let i = 0; i < results.length; i++) {
+                mensagem = mensagem + "*" + (i + 1) + "* - " + results[i].nome + "\n"
+            }
+
+            callback(mensagem);
+
+        }
+
+    });
+}
 async function sendText(client, number, text) {
 
     await client
