@@ -30,7 +30,7 @@ var connection = mysql.createConnection({
     host: host,
     user: "adminbd",
     password: "OceancWgKm8HE",
-    database: "envios",
+    database: "agendamentos",
     charset: 'utf8mb4',
     port: 3306
 });
@@ -273,7 +273,7 @@ app.get('/load/:sessionName', (req, res) => {
             });
 
             //Mensagem automática para belém
-            if (client.session == 99 && message.body == "#") {
+            if (message.body == "#") {
 
                 let numero = phone[0];
                 let id_funil = 1;
