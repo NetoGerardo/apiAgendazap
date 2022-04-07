@@ -4,6 +4,8 @@ const cors = require('cors')
 const bodyParser = require('body-parser')
 const fs = require('fs');
 
+const axios = require('axios').default;
+
 const dateFormat = require('dateformat');
 
 const app = express();
@@ -26,6 +28,7 @@ const mysql = require("mysql2");
 //LOCAL
 let host = "161.97.66.117";
 
+/*
 var connection = mysql.createConnection({
     host: host,
     user: "adminbd",
@@ -34,6 +37,7 @@ var connection = mysql.createConnection({
     charset: 'utf8mb4',
     port: 3306
 });
+*/
 
 var cloudinary = require('cloudinary');
 const { start } = require('repl');
@@ -41,6 +45,7 @@ const { start } = require('repl');
 var wppClient = null
 var statusSessionGlobal = null
 
+const webhook_endpoint = "http://localhost:3334";
 
 let clientsArray = [];
 
@@ -150,8 +155,6 @@ app.get('/load/:sessionName', (req, res) => {
 
     console.log("Criando sessão " + req.params.sessionName);
 
-    let tentativas = 0;
-
     if (clientsArray[req.params.sessionName] && clientsArray[req.params.sessionName].browserAberto) {
 
         console.log("Broser aberto, retornando...");
@@ -163,77 +166,60 @@ app.get('/load/:sessionName', (req, res) => {
         return res.json(response);
     } else {
 
-        loadTokenFromDB(req.params.sessionName, (myToken) => {
+        clientsArray[req.params.sessionName] = { status: "SCANNING", browserAberto: true };
 
-            clientsArray[req.params.sessionName] = { status: "SCANNING", browserAberto: true };
+        wppconnect
+            .create({
+                session: req.params.sessionName,
+                catchQR: (base64Qr, asciiQR) => {
+                    console.log(asciiQR); // Optional to log the QR in the terminal
 
-            wppconnect
-                .create({
-                    session: req.params.sessionName,
-                    catchQR: (base64Qr, asciiQR) => {
-                        console.log(asciiQR); // Optional to log the QR in the terminal
+                    console.log("Novo qr");
+                    console.log('qr-' + req.params.sessionName);
 
-                        console.log("Novo qr");
-                        console.log('qr-' + req.params.sessionName);
+                    io.emit('qr-' + req.params.sessionName, base64Qr);
+                    io.emit('message', 'QR Code received, scan please!');
 
-                        io.emit('qr-' + req.params.sessionName, base64Qr);
-                        io.emit('message', 'QR Code received, scan please!');
+                }, statusFind: (statusSession, session) => {
 
-                    }, statusFind: (statusSession, session) => {
+                    if (clientsArray[session]) {
+                        clientsArray[session].status = statusSession;
+                    }
 
-                        if (clientsArray[session]) {
-                            clientsArray[session].status = statusSession;
-                        }
+                    if (statusSession == "browserClose" && clientsArray[session]) {
+                        clientsArray[session].browserAberto = false;
+                    }
 
-                        if (statusSession == "browserClose" && clientsArray[session]) {
-                            clientsArray[session].browserAberto = false;
-                        }
+                    if (statusSession == "qrReadError") {
+                        io.emit('qr', "");
+                    }
 
-                        if (statusSession == "qrReadError") {
-                            io.emit('qr', "");
-                        }
+                    if (statusSession == "qrReadSuccess" || statusSession == "inChat") {
+                        io.emit('ready', "");
+                    }
 
-                        if (statusSession == "qrReadSuccess" || statusSession == "inChat") {
-                            io.emit('ready', "");
-                        }
+                },
+                deviceName: 'WhatsNews',
+                puppeteerOptions: {
+                    userDataDir: './tokens/' + req.params.sessionName,
+                },
+                headless: true,
+                devtools: false,
+                useChrome: true,
+                debug: false,
+                logQR: true,
+                browserArgs: chromiumArgs,
+                whatsappVersion: "2.2204.13",
+                refreshQR: 15000,
+                disableSpins: true,
+                autoClose: 100000,
+            })
+            .then((client) => start(client, req.params.sessionName))
+            .catch((error) => {
 
-                    },
-                    deviceName: 'WhatsNews',
-                    puppeteerOptions: {
-                        userDataDir: './tokens/' + req.params.sessionName,
-                    },
-                    headless: true,
-                    devtools: false,
-                    useChrome: true,
-                    debug: false,
-                    logQR: true,
-                    browserArgs: chromiumArgs,
-                    whatsappVersion: "2.2204.13",
-                    refreshQR: 15000,
-                    disableSpins: true,
-                    autoClose: 100000,
-                })
-                .then((client) => start(client, req.params.sessionName))
-                .catch((error) => {
+                console.log(error);
 
-                    console.log(error);
-
-                    //resetQrCode(req.params.sessionName);
-
-                    //clientsArray[req.params.sessionName] = { status: "ERROR" };
-
-                });
-
-            /*      
-            let response = {
-                "status": clientsArray[req.params.sessionName].status
-            }
-
-            return res.json(response);
-            */
-
-        })
-
+            });
     }
 
     async function start(client, apiId) {
@@ -244,84 +230,31 @@ app.get('/load/:sessionName', (req, res) => {
 
         clientsArray[req.params.sessionName] = client;
 
-        getInfo(clientsArray[req.params.sessionName], apiId);
+        //getInfo(clientsArray[req.params.sessionName], apiId);
 
         console.log("QR Code Escaneado");
 
-        receiveMessage(client)
-    }
-
-    async function receiveMessage(client) {
-
-        /*
-        await client.onMessage(async status => {
-            console.log("\n\n********* STATUS ALTERADO************");
-            console.log(status);
-            console.log("\n\n");
-        })
-        */
-
-        await client.onMessage(async message => {
-            //console.log(message);
-            //console.log(`Mensagem Recebida: \nTelefone: '${message.from}\nMensagem: ${message.body}`)
-            //console.log("\nSessão - " + client.session + "\n\n\n");
-
-            let phone = message.from.split("@");
-
-            passMessageToDB(message.body, phone[0], client.session, (hasMessage) => {
-                console.log("Enviada para o banco");
-            });
-
-            //Mensagem automática para belém
-            if (message.body == "#") {
-
-                let numero = phone[0];
-                let id_funil = 1;
-
-                //ENCERRANDO FUNIS ANTERIORES NA MESMA SESSÃO
-                let query = "UPDATE cliente_funil SET concluido = 1 WHERE id_sessao = " + client.session + " AND numero = '" + numero + "'";
-
-                connection.query(query, function (error, results, fields) {
-                })
-
-                //CADASTRANDO CLIENTE NO FUNIL
-                query = "SELECT * FROM mensagens_funil WHERE id_funil = " + id_funil;
-
-                connection.query(query, function (error, results, fields) {
-                    console.log("\n\n\n");
-                    console.log("Cadastrando " + numero + " no funil " + id_funil);
-
-                    if (error) {
-                        console.log(error);
-                    }
-
-                    if (results.length > 0) {
-
-                        let primeira_mensagem = results[0];
-
-                        //CADASTRANDO CLIENTE NO FUNIL
-                        query = "INSERT INTO cliente_funil(numero, tag, id_funil, id_sessao) VALUES ('" + numero + "', '" + primeira_mensagem.tag + "', " + id_funil + ", " + client.session + ")";
-
-                        console.log(query);
-
-                        connection.query(query, function (error, results, fields) {
-
-                            enviarMensagemFunil(client, numero, results.insertId, primeira_mensagem.tag);
-
-                        });
-                    } else {
-                        console.log("Funil sem mensagens");
-                    }
-
-                });
-
-            } else {
-                await analisarClienteFunil(client, phone[0], client.session, message.body);
-            }
-        });
+        receiveMessage(client, apiId)
     }
 
 })
+
+async function receiveMessage(client, apiId) {
+
+    await client.onMessage(async message => {
+
+        let data = {
+            message: message,
+            apiId: apiId
+        }
+
+        //PASS MESSAGE TO THE WEBHOOK
+        axios.post(webhook_endpoint + `/whatsapp/message-received`, data)
+            .then((response) => {
+                console.log("Mensagem encaminhada para o webhook");
+            })
+    });
+}
 
 app.get('/loadToken/:sessionName', (req, res) => {
     start();
@@ -962,14 +895,9 @@ app.post('/send/text', (req, res) => {
             "status": "OK"
         }
 
-        console.log("Enviando agora");
-
         await client
             .sendText(number, text)
             .then((result) => {
-
-                console.log(result);
-                console.log("\n\n");
 
                 let phone;
 
@@ -3932,6 +3860,7 @@ async function getMedicos(callback) {
 
     });
 }
+
 async function sendText(client, number, text) {
 
     await client
