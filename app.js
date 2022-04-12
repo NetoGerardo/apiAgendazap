@@ -31,14 +31,10 @@ let clientsArray = [];
 var chromiumArgs = ['--disable-web-security', '--no-sandbox', '--disable-web-security', '--aggressive-cache-discard', '--disable-cache', '--disable-application-cache', '--disable-offline-load-stale-cache', '--disk-cache-size=0', '--disable-background-networking', '--disable-default-apps', '--disable-extensions', '--disable-sync', '--disable-translate', '--hide-scrollbars', '--metrics-recording-only', '--mute-audio', '--no-first-run', '--safebrowsing-disable-auto-update', '--ignore-certificate-errors', '--ignore-ssl-errors', '--ignore-certificate-errors-spki-list'];
 
 app.get('/', (req, res) => {
-
-    let response = {
-        "status": "OK"
-    }
-
-    return res.json(response);
-})
-
+    res.sendFile('index.html', {
+        root: __dirname
+    });
+});
 
 app.get('/load/:sessionName', (req, res) => {
 
@@ -67,34 +63,11 @@ app.get('/load/:sessionName', (req, res) => {
                 catchQR: (base64Qr, asciiQR) => {
                     console.log(asciiQR); // Optional to log the QR in the terminal
 
-                    //io.emit('qr', base64Qr);
-
                     console.log("Novo qr");
                     console.log('qr-' + req.params.sessionName);
 
                     io.emit('qr-' + req.params.sessionName, base64Qr);
                     io.emit('message', 'QR Code received, scan please!');
-
-                    var matches = base64Qr.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/),
-                        response = {};
-
-                    if (matches.length !== 3) {
-                        return new Error('Invalid input string');
-                    }
-                    response.type = matches[1];
-                    response.data = new Buffer.from(matches[2], 'base64');
-
-                    var imageBuffer = response;
-                    require('fs').writeFile(
-                        'qr-codes/' + req.params.sessionName + '.png',
-                        imageBuffer['data'],
-                        'binary',
-                        function (err) {
-                            if (err != null) {
-                                console.log(err);
-                            }
-                        }
-                    );
                 }, statusFind: (statusSession, session) => {
 
                     if (statusSession == "browserClose" && clientsArray[session]) {
@@ -116,20 +89,6 @@ app.get('/load/:sessionName', (req, res) => {
                         clientsArray[session].status = statusSession;
                     }
 
-                    if (tentativas == 0) {
-
-                        //console.log("\n\n*****Retornando resposta do LOAD*****\n\n");
-
-                        tentativas = tentativas + 1;
-
-                        let response = {
-                            "status": clientsArray[req.params.sessionName].status
-                        }
-
-                        return res.json(response);
-                    } else {
-                        //console.log("\n\n*****Não retornou...*****\n\n");
-                    }
 
                 },
                 deviceName: 'WhatsNews',
@@ -152,20 +111,7 @@ app.get('/load/:sessionName', (req, res) => {
 
                 console.log(error);
 
-                //resetQrCode(req.params.sessionName);
-
-                //clientsArray[req.params.sessionName] = { status: "ERROR" };
-
             });
-
-        /*      
-        let response = {
-            "status": clientsArray[req.params.sessionName].status
-        }
-
-        return res.json(response);
-        */
-
 
 
     }
@@ -184,37 +130,24 @@ app.get('/load/:sessionName', (req, res) => {
 
         receiveMessage(client)
     }
-
-    async function receiveMessage(client) {
-
-        await client.onMessage(async message => {
-            //console.log(message);
-            //console.log(`Mensagem Recebida: \nTelefone: '${message.from}\nMensagem: ${message.body}`)
-            //console.log("\nSessão - " + client.session + "\n\n\n");
-
-            let phone = message.from.split("@");
-
-            passMessageToDB(message.body, phone[0], client.session, (hasMessage) => {
-                console.log("Enviada para o banco");
-            });
-
-            let isOnFunil = await analisarClienteFunil(client, phone[0], client.session, message.body);
-
-            //Mensagem automática para belém
-            if (client.session == 10) {
-                let text = "Para informações e matrículas, entre em contato pelo numero 91 99602-1111 ou clique no link abaixo:";
-                let url = "https://wa.me/559196021111";
-
-                client
-                    .sendLinkPreview(message.from, url, text)
-                    .then((result) => { })
-            }
-
-
-        });
-    }
-
 })
+
+async function receiveMessage(client, apiId) {
+
+    await client.onMessage(async message => {
+
+        let data = {
+            message: message,
+            apiId: apiId
+        }
+
+        //PASS MESSAGE TO THE WEBHOOK
+        axios.post(webhook_endpoint + `/whatsapp/message-received`, data)
+            .then((response) => {
+                console.log("Mensagem encaminhada para o webhook");
+            })
+    });
+}
 
 app.get('/sessionStatus/:sessionName', (req, res) => {
     if (clientsArray[req.params.sessionName]) {
