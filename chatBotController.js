@@ -8,6 +8,8 @@ const dateFormat = require('dateformat');
 //LOCAL
 let host = "161.97.66.117";
 
+let io;
+
 const api_endpoint = "http://localhost:3333";
 
 var connection = mysql.createConnection({
@@ -19,7 +21,9 @@ var connection = mysql.createConnection({
     port: 3306
 });
 
-exports.receiveMessage = function (message, session, io) {
+exports.receiveMessage = function (message, session, my_io) {
+
+    io = my_io;
 
     let client = session;
 
