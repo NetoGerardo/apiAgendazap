@@ -19,7 +19,7 @@ var connection = mysql.createConnection({
     port: 3306
 });
 
-exports.receiveMessage = function (message, session) {
+exports.receiveMessage = function (message, session, io) {
 
     let client = session;
 
@@ -747,6 +747,8 @@ async function storeAgendamento(cliente_funil, callback) {
 
                 console.log("Response get medicos");
                 console.log(response);
+
+                io.emit('agendamento', "Nova consulta agendada!");
 
                 callback(response);
 
