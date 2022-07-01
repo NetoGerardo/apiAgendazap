@@ -9,13 +9,9 @@ app.use(express.json({ limit: '200mb' }));
 const http = require('http').Server(app);
 const io = require('socket.io')(http);
 
-const chatBotController = require('./chatBotController.js');
+const chatBotControllerGMED = require('./chatBotControllerGMED.js');
 
 app.get('/', (req, res) => {
-
-    envios.list().then(rows => {
-        console.log(rows);
-    })
 
     let response = {
         "status": "OK"
@@ -34,7 +30,7 @@ app.post('/whatsapp/message-received', (req, res) => {
     console.log(`Mensagem Recebida: \nTelefone: '${message.from}\nMensagem: ${message.body}`)
 
     try {
-        chatBotController.receiveMessage(message, session, io);
+        chatBotControllerGMED.receiveMessage(message, session, io);
 
         let response = {
             "status": "OK"
