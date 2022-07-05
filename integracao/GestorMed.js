@@ -140,7 +140,7 @@ exports.listarMedicos = function (clinica, id_especialidade) {
 function buscarMedicosComAgenda(medicos) {
     return new Promise(function (res, rej) {
 
-        let mensagem = "*Escolha o médico:*\n\n";
+        let mensagem = "*Escolha uma das opções:*\n\n";
 
         let options = []
 

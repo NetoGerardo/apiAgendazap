@@ -26,6 +26,8 @@ const http = require('http').Server(app);
 const io = require('socket.io')(http);
 const qrcode = require('qrcode');
 
+const webhook_endpoint = "http://localhost:3334";
+
 let clientsArray = [];
 
 var chromiumArgs = ['--disable-web-security', '--no-sandbox', '--disable-web-security', '--aggressive-cache-discard', '--disable-cache', '--disable-application-cache', '--disable-offline-load-stale-cache', '--disk-cache-size=0', '--disable-background-networking', '--disable-default-apps', '--disable-extensions', '--disable-sync', '--disable-translate', '--hide-scrollbars', '--metrics-recording-only', '--mute-audio', '--no-first-run', '--safebrowsing-disable-auto-update', '--ignore-certificate-errors', '--ignore-ssl-errors', '--ignore-certificate-errors-spki-list'];
@@ -52,8 +54,6 @@ app.get('/load/:sessionName', (req, res) => {
 
         return res.json(response);
     } else {
-
-        resetQrCode(req.params.sessionName);
 
         clientsArray[req.params.sessionName] = { status: "SCANNING", browserAberto: true };
 
@@ -141,10 +141,15 @@ async function receiveMessage(client, apiId) {
             apiId: apiId
         }
 
+        console.log("Mensagem recebida");
+
         //PASS MESSAGE TO THE WEBHOOK
         axios.post(webhook_endpoint + `/whatsapp/message-received`, data)
             .then((response) => {
                 console.log("Mensagem encaminhada para o webhook");
+            }).catch((erro) => {
+                console.log("Falha ao enviar pro webhook");
+                console.log(erro);
             })
     });
 }
@@ -345,5 +350,5 @@ io.on("connection", function (client) {
 
 
 http.listen(3333, function () {
-    console.log('listening on port 3000');
+    console.log('listening on port 3333');
 });

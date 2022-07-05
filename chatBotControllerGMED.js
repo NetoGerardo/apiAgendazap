@@ -27,7 +27,7 @@ exports.receiveMessage = function (message, session) {
 
     let phone = message.from.split("@");
 
-    if (message.body == "#") {
+    if (message.body.toLowerCase() == "agendar") {
 
         let numero = phone[0];
         let id_funil = 1;
@@ -492,7 +492,7 @@ async function getMedicos(callback) {
 
     gestorMed.listarEspecialidades("econ").then(especialidades => {
 
-        let mensagem = "*Qual médico você precisa?*\n\n";
+        let mensagem = "*Escolha a especialidade:*\n\n";
 
         let options = []
 
