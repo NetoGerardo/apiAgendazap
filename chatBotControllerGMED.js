@@ -75,6 +75,13 @@ exports.receiveMessage = function (message, session) {
 
 };
 
+function respostaAutomaticaSemFunil(wpp_client, numero, id_sessao, mensagem_recebida) {
+
+    let resposta = "Bem vindo ao agendamento automático da *Clínica Potiguar Zona Norte!*\n\nPara iniciar um agendamento digite *agendar*"
+
+    sendText(id_sessao, numero + "@c.us", resposta);
+}
+
 async function analisarClienteFunil(wpp_client, numero, id_sessao, mensagem_recebida) {
 
     console.log("Analisando cliente no funil");
@@ -198,6 +205,8 @@ async function analisarClienteFunil(wpp_client, numero, id_sessao, mensagem_rece
         } else {
 
             console.log("Cliente não está em nenhum funil");
+
+            respostaAutomaticaSemFunil(wpp_client, numero, id_sessao, mensagem_recebida);
 
             //CASO O CLIENTE NÃO ESTEJA EM NENHUM FUNIL
             return false
@@ -338,8 +347,12 @@ async function enviarMensagemFunil(wpp_client, numero_cliente_funil, id_cliente_
                     //VERIFICANDO SE É A ÚLTIMA MENSAGEM DO FUNIL
                     if (results[0].fim_funil == 1 || encerrar_funil) {
 
+                        console.log("ENCERRANDO FUNIL");
+
                         //ENCERRANDO FUNIL
                         let query = "UPDATE cliente_funil SET concluido = 1 WHERE id = " + id_cliente_funil + " ;";
+
+                        console.log(query);
 
                         connection.query(query, function (error, results, fields) {
 
@@ -706,7 +719,7 @@ async function storeAgendamento(cliente_funil, callback) {
 
         let dados = JSON.parse(cliente_funil.meta_dados);
 
-        let mensagem = "Consulta agendada! ✅";
+        let mensagem = "Consulta agendada! ✅\n\n";
 
         gestorMed.registrarConsulta(dados).then(resposta => {
             console.log("CONSULTA REGISTRADA NO GMED");
@@ -745,13 +758,15 @@ function sendConfirmationMessage(cliente) {
             "\n*Valor da consulta:* R$" + dadosGMED.valor_consulta;
 
         if (response.found) {
-            console.log("ENCONTROU SIM");
-            mensagem = mensagem + "\n\nHorário: " + response.horario;
+            mensagem = mensagem + "\n\n*Horário:* " + response.horario;
         }
+
+        mensagem = mensagem + "\n\n*Endereço*:\n" + "https://g.page/CLINICAPOTIGUARZN?share";
 
         //ENVIANDO MENSAGEM DE CONFIRMAÇÃO
         sendText(1, "558499506625@c.us", mensagem);
         sendText(1, "558496750131@c.us", mensagem);
+        sendText(1, cliente.whatsapp + "@c.us", mensagem);
 
     });
 
